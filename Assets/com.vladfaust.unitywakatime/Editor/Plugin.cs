@@ -2,6 +2,7 @@
 
 using System;
 using System.IO;
+using Editor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.Networking;
@@ -24,6 +25,7 @@ namespace WakaTime {
     private static string _apiKey = "";
     private static bool _enabled = true;
     private static bool _debug = true;
+    private static string _url = URL_PREFIX;
 
     private const string URL_PREFIX = "https://api.wakatime.com/api/v1/";
     private const int HEARTBEAT_COOLDOWN = 120;
@@ -34,7 +36,22 @@ namespace WakaTime {
       Initialize();
     }
 
-    public static void Initialize() {
+    public static void Initialize()
+    {
+      var url = WakatimeConfigReader.GetApiUrl();
+      if (!string.IsNullOrEmpty(url))
+      {
+        if (!url.EndsWith("/"))
+        {
+          url += "/";
+        }
+        _url = url;
+      }
+      else
+      {
+        _url = URL_PREFIX;
+      }
+      
       if (EditorPrefs.HasKey(ENABLED_PREF))
         _enabled = EditorPrefs.GetBool(ENABLED_PREF);
 
@@ -125,7 +142,7 @@ namespace WakaTime {
     }
 
     static void SendHeartbeat(bool fromSave = false) {
-      if (_debug) Debug.Log("<WakaTime> Sending heartbeat...");
+      if (_debug) Debug.Log($"<WakaTime> Sending heartbeat...\n{_url}");
 
       var currentScene = EditorSceneManager.GetActiveScene().path;
       var file = currentScene != string.Empty
@@ -141,7 +158,7 @@ namespace WakaTime {
 
       var heartbeatJSON = JsonUtility.ToJson(heartbeat);
 
-      var request = UnityWebRequest.Post(URL_PREFIX + "users/current/heartbeats?api_key=" + _apiKey, string.Empty);
+      var request = UnityWebRequest.PostWwwForm(_url + "users/current/heartbeats?api_key=" + _apiKey, string.Empty);
       request.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(heartbeatJSON));
       request.SetRequestHeader("Content-Type", "application/json");
 
@@ -165,8 +182,7 @@ namespace WakaTime {
             }
             else {
               Debug.LogError(
-                "<WakaTime> Failed to send heartbeat to WakaTime!\n" +
-                response.error);
+                $"<WakaTime> Failed to send heartbeat to WakaTime!\n{response.error}\n{_url}");
             }
           }
           else {
